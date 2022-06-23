@@ -1,0 +1,415 @@
+<!DOCTYPE html>
+<html>
+	<head>
+		<title>DDC</title>
+		<meta charset="UTF-8">
+		<meta name="viewport" content="width=device-width, initial-scale=1">
+
+		<script src="https://cdnjs.cloudflare.com/ajax/libs/crypto-js/3.1.2/rollups/hmac-sha256.js"></script>
+		<script src="https://cdnjs.cloudflare.com/ajax/libs/crypto-js/3.1.2/components/enc-base64-min.js"></script>
+		<script src="http://code.jquery.com/jquery-latest.min.js"></script>
+
+		<script>
+			function copy() {
+				var copyText = document.getElementById("xmlRequest");
+				copyText.select();
+				document.execCommand("copy");
+				alert("Copied");
+			}
+
+			function on(xmlType) {
+				
+				if(xmlType == "Flex") {			
+					document.getElementById("xmlContent").innerHTML = "<h2>" + xmlType + "</h2><p><textarea id=\"xmlRequest\" style=\"height:600px\">" + getXml(xmlType) + "</textarea>";
+				} else {
+					document.getElementById("xmlContent").innerHTML = "<h2>" + xmlType + "</h2><p><textarea id=\"xmlRequest\" style=\"height:600px\">" + getXml(xmlType) + "</textarea>";
+				}		
+				document.getElementById("overlay").style.display = "block";
+			}
+
+			function off() {
+			  document.getElementById("overlay").style.display = "none";
+			}
+		</script>
+
+		<script>
+			function getXml(xmlType){
+				var now = new Date();
+				var milliseconds = Math.round(now.getTime());
+				var paymentDetails = "";
+				
+				if(xmlType == "Flex") {			
+					paymentDetails = "<paymentDetails>";
+				} else {
+					paymentDetails = "<paymentDetails action=\"AUTHENTICATE\">";
+				}	
+
+				var xmlString = 
+				"<?xml version=\"1.0\" encoding=\"UTF-8\"?>" + "\n" +
+				"<!DOCTYPE paymentService PUBLIC \"-//WorldPay//DTD WorldPay PaymentService v1//EN\" \"http://dtd.worldpay.com/paymentService_v1.dtd\">" + "\n" +
+				"<paymentService version=\"1.4\" merchantCode=\"MERCHANTCODE\">" + "\n" +
+				 "<submit>" + "\n" +
+				  "<order orderCode=\"" + milliseconds + "\">" + "\n" +
+				   "<description>test order</description>" + "\n" +
+				   "<amount value=\"100\" currencyCode=\"AUD\" exponent=\"2\"/>" + "\n" +
+				   "<orderContent><![CDATA[]]></orderContent>" + "\n" +
+				   paymentDetails + "\n" +
+					"<CARD-SSL>" + "\n" +
+					 "<cardNumber>4444333322221111</cardNumber>" + "\n" +
+					 "<expiryDate><date month=\"06\" year=\"2023\"/></expiryDate>" + "\n" +
+					 "<cardHolderName>3DS_V2_CHALLENGE_IDENTIFIED</cardHolderName>" + "\n" +
+					 "<cvc>666</cvc>" + "\n" +
+					 "<cardAddress>" + "\n" +
+					  "<address>" + "\n" +
+					   "<address1>Worldpay</address1>" + "\n" +
+					   "<postalCode>AAAAA</postalCode>" + "\n" +
+					   "<city>Cambridge</city>" + "\n" +
+					   "<countryCode>GB</countryCode>" + "\n" +
+					  "</address>" + "\n" +
+					 "</cardAddress>" + "\n" +
+					"</CARD-SSL>" + "\n" +
+					"<session shopperIPAddress=\"127.0.0.1\" id=\"" + milliseconds + "\"/>" + "\n" +
+				   "</paymentDetails>" + "\n" +
+				   "<shopper>" + "\n" +
+					"<browser>" + "\n" +
+					 "<acceptHeader>text/html</acceptHeader>" + "\n" +
+					 "<userAgentHeader>Mozilla/5.0 ...</userAgentHeader>" + "\n" +
+					"</browser>" + "\n" +
+				   "</shopper>" + "\n" +
+				   "<additional3DSData dfReferenceId=\"" + document.getElementById("dfReferenceId").value + "\"/>" + "\n" +
+				  "</order>" + "\n" +
+				 "</submit>" + "\n" +
+				"</paymentService>";
+				
+				return xmlString;
+			}
+		</script>
+
+		<script>
+			$(document).on("click", "#gen", function() {
+					
+				var secret = "API Key";
+				var jwtBody = JSON.parse($("#jwtBody").val());
+
+				var header = {
+					"alg": "HS256",
+					"typ": "JWT" };
+
+				function base64url(source) {
+					// Encode in classical base64
+					encodedSource = CryptoJS.enc.Base64.stringify(source);
+
+					// Remove padding equal characters
+					encodedSource = encodedSource.replace(/=+$/, '');
+
+					// Replace characters according to base64url specifications
+					encodedSource = encodedSource.replace(/\+/g, '-');
+					encodedSource = encodedSource.replace(/\//g, '_');
+
+					return encodedSource;
+				}
+
+				var stringifiedHeader = CryptoJS.enc.Utf8.parse(JSON.stringify(header));
+				var encodedHeader = base64url(stringifiedHeader);
+
+				var stringifiedData = CryptoJS.enc.Utf8.parse(JSON.stringify(jwtBody));
+				var encodedData = base64url(stringifiedData);
+
+				var signature = encodedHeader + "." + encodedData;
+				signature = CryptoJS.HmacSHA256(signature, secret);
+				signature = base64url(signature);
+
+				console.log("JWT: " + encodedHeader+"."+encodedData+"."+signature);
+				$("#jwt").val(encodedHeader+"."+encodedData+"."+signature);			
+			});
+		</script>
+
+		<script>
+			$(document).on("click", "#pay", function() {
+					
+				var ddcFrame = $("#ddcFrame").contents().find('body');			
+				var jwt = $("#jwt").val();
+				var bin = $("#cardNumber").val();			
+
+				var ddcForm = jQuery('<form>', {
+						'action': 'https://centinelapistag.cardinalcommerce.com/V1/Cruise/Collect',
+						'name': 'devicedata',
+						'method': 'post'
+					}).append(jQuery('<input>', {
+						'name': 'Bin',
+						'value': bin,
+						'type': 'hidden'
+					}).append(jQuery('<input>', {
+						'name': 'JWT',
+						'value': jwt,
+						'type': 'hidden'
+				})));
+				ddcForm.appendTo(ddcFrame).submit();			
+			});
+		</script>
+
+		<script>         
+			window.addEventListener("message", function(event) {
+				//console.log('Event:', event);
+				if (event.origin === "https://centinelapistag.cardinalcommerce.com") {
+					var data = JSON.parse(event.data);
+					console.log('Event:', event);
+
+					if (data !== undefined && data.Status) {
+						console.log('DDC result:', data);
+						$("#ddcResult").val(JSON.stringify(data));
+						$("#dfReferenceId").val(data.SessionId);
+					}			
+				}
+			}, false);
+		</script>
+
+		<style>
+			{
+			  box-sizing: border-box;
+			}
+
+			/* Style the body */
+			body {
+			  font-family: Arial;
+			  margin: 0;
+			}
+
+			/* Header/logo Title */
+			.header {
+			  padding: 60px;
+			  text-align: center;
+			  background: #1abc9c;
+			  color: white;
+			}
+
+			/* Style the top navigation bar */
+			.navbar {
+			  display: flex;
+			  background-color: #333;
+			}
+
+			/* Style the navigation bar links */
+			.navbar a {
+			  color: white;
+			  padding: 14px 20px;
+			  text-decoration: none;
+			  text-align: center;
+			}
+
+			/* Change color on hover */
+			.navbar a:hover:not(.active) {
+			  background-color: #ddd;
+			  color: black;
+			}
+
+			.navbar a.active {
+			  background-color: #1abc9c;
+			  color: white;
+			}
+
+			/* Column container */
+			.row {  
+			  display: flex;
+			  flex-wrap: nowrap;
+			}
+
+			/* Create three unequal columns that sits next to each other */
+			/* Left column */
+			.left {
+			  flex: 33%;
+			  background-color: white;
+			  padding: 20px;
+			}
+
+			/* Middle column */
+			.middle {
+			  flex: 33%;
+			  background-color: #f1f1f1;
+			  padding: 20px;
+			}
+
+			/* Right column */
+			.right {
+			  flex: 33%;
+			  background-color: white;
+			  padding: 20px;
+			}
+
+			/* Footer */
+			.footer {
+			  padding: 20px;
+			  text-align: center;
+			  background: #ddd;
+			}
+
+			/* Responsive layout - when the screen is less than 700px wide, make the two columns stack on top of each other instead of next to each other */
+			@media screen and (max-width: 700px) {
+			  .row, .navbar {   
+				flex-direction: column;
+			  }
+			}
+
+			/* Form elements */
+			input[type=text], select {
+			  width: 100%;
+			  padding: 12px 20px;
+			  margin: 8px 0;
+			  display: inline-block;
+			  border: 1px solid #ccc;
+			  border-radius: 4px;
+			  box-sizing: border-box;
+			}
+
+			.button {
+			  width: 100%;
+			  background-color: #4CAF50;
+			  color: white;
+			  padding: 14px 20px;
+			  margin: 8px 5px;
+			  border: none;
+			  border-radius: 4px;
+			  cursor: pointer;
+			}
+
+			.button:hover {
+			  background-color: #45a049;
+			}
+
+			textarea {
+			  width: 100%;
+			  padding: 12px 20px;
+			  margin: 8px 0;
+			  display: inline-block;
+			  border: 1px solid #ccc;
+			  border-radius: 4px;
+			  box-sizing: border-box;
+			  resize: none;
+			  height: 150px;
+			}
+
+			.btn-group button {
+			  width: 100%;
+			}
+
+			/* Clear floats (clearfix hack) */
+			.btn-group:after {
+			  content: "";
+			  clear: both;
+			  display: table;
+			}
+
+			#overlay {
+			  position: fixed; /* Sit on top of the page content */
+			  display: none; /* Hidden by default */
+			  width: 100%; /* Full width (cover the whole page) */
+			  height: 100%; /* Full height (cover the whole page) */
+			  top: 0; 
+			  left: 0;
+			  right: 0;
+			  bottom: 0;
+			  background-color: rgba(0,0,0,0.5); /* Black background with opacity */
+			  z-index: 1; /* Specify a stack order in case you're using a different order for other elements */
+			  cursor: pointer; /* Add a pointer on hover */
+			}
+
+			#overlayContent {
+				position: relative;
+				max-width: 700px;
+				margin: 50px auto;
+				background: white;
+				padding: 10px;
+				z-index: 10;
+			}
+		</style>
+	</head>
+	<body>
+
+		<div id="overlay">
+			<div id="overlayContent">
+				<div id="xmlContent"></div>
+
+				<div class="btn-group">
+					<button class="button" style="width:45%;float:left" onclick="copy()">Copy</button>
+					<button class="button" style="width:45%;float:right;background-color:red;" onclick="off()">Close</button> 
+				</div>
+			</div>
+		</div>
+
+		<!-- Header -->
+		<div class="header">
+		  <h1>3DS Flex - Test</h1>
+		  <p>Device Data Collection and Challenge Simulator.</p>
+		</div>
+
+		<!-- Navigation Bar -->
+		<div class="navbar">
+		  <a class="active" href="ddc-test.html">DDC</a>
+		  <a href="challenge-test.html">Challenge</a>
+		  <a href="tools.html">Tools</a>
+		</div>
+
+		<!-- The flexible grid (content) -->
+		<div class="row">
+
+		  <div class="left">
+			<h2>JWT</h2> 
+			<label for="jwtBody">JWT body</label>
+			<textarea id="jwtBody"></textarea>
+
+			<button class="button" id="gen">Generate</button> 
+		  </div>
+
+		  <script>
+			function uuidv4() {
+					return `${1e7}-${1e3}-${4e3}-${8e3}-${1e11}`.replace(/[018]/g, c =>
+						(c ^ crypto.getRandomValues(new Uint8Array(1))[0] & 15 >> c / 4).toString(16)
+					)
+				}
+			
+			var now = new Date();
+			var seconds = Math.round(now.getTime() / 1000);
+
+			var jwtdata = {
+			"jti": uuidv4(),
+			"iat": seconds,
+			"iss": "API ID",
+			"OrgUnitId": "Org Unit ID"};
+
+			$("#jwtBody").val(JSON.stringify(jwtdata,null,2));
+		   </script>
+
+		  <div class="middle">
+			<h2>DDC - Request</h2>
+			<label for="cardNumber">Card number</label>
+			<input type="text" id="cardNumber" placeholder="Card number - Minimum 6 digits">
+
+			<label for="jwt">JWT</label>
+			<input type="text" id="jwt" placeholder="JWT - Device Data Collection">
+			
+			<button class="button" id="pay">Submit</button> 
+		  </div>
+
+		  <div class="right">
+			<h2>DDC - Response</h2>
+			<label for="dfReferenceId">dfReferenceId</label>
+			<input type="text" id="dfReferenceId" placeholder="">
+			
+			<label for="ddcResult">Callback data</label>
+			<textarea id="ddcResult"></textarea>
+			<div class="btn-group">
+				<button class="button" style="width:45%;float:left" id="flex" onclick="on('Flex')">Flex</button>
+				<button class="button" style="width:45%;float:right" id="split" onclick="on('Split')">Split</button> 
+			</div>
+
+		  </div>
+		</div>
+
+		<!-- Footer -->
+		<div class="footer">
+		  <h2>Footer</h2>
+		  <iframe id="ddcFrame" width="1" height="1" style="display: none;"></iframe> 
+		</div>
+
+	</body>
+</html>
