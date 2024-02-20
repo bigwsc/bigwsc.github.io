@@ -20,7 +20,7 @@ function buildPaymentRequest() {
         'allowedCardNetworks': ['VISA', 'MASTERCARD', 'AMEX'],
       },
       merchantName: 'Rouslan Solomakhin',
-      merchantId: '00184145120947117657',
+      merchantId: 'BCR2DN4TR25ZTKZD',
       paymentMethodTokenizationParameters: {
         tokenizationType: 'GATEWAY_TOKEN',
         parameters: {
