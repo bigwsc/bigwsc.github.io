@@ -123,7 +123,10 @@
               <section id="card-expiry" class="field"></section>
             </section>
 
-
+            <section class="col">
+              <label class="label" for="card-cvv">CVV</label>
+              <section id="card-cvv" class="field"></section>
+            </section>
           </section>
 
           <button class="submit" type="submit">Pay Now</button>
@@ -146,7 +149,10 @@
                 selector: "#card-pan",
                 placeholder: "4444333322221111",
               },
-              
+              cvv: {
+                selector: "#card-cvv",
+                placeholder: "123",
+              },
               expiry: {
                 selector: "#card-expiry",
                 placeholder: "MM/YY",
